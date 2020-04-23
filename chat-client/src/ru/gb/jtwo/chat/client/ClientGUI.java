@@ -15,6 +15,7 @@ public class ClientGUI extends JFrame implements ActionListener, Thread.Uncaught
 
     private static final int WIDTH = 400;
     private static final int HEIGHT = 300;
+    private static int visibleFlag = 1;
 
     private final JTextArea log = new JTextArea();
     private final JPanel panelTop = new JPanel(new GridLayout(2, 3));
@@ -33,6 +34,7 @@ public class ClientGUI extends JFrame implements ActionListener, Thread.Uncaught
     private final JList<String> userList = new JList<>();
     private boolean shownIoErrors = false;
     private SocketThread socketThread;
+    private Socket socket;
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(new Runnable() {
@@ -62,6 +64,7 @@ public class ClientGUI extends JFrame implements ActionListener, Thread.Uncaught
         tfMessage.addActionListener(this);
         btnSend.addActionListener(this);
         btnLogin.addActionListener(this);
+        btnDisconnect.addActionListener(this);
 
         panelTop.add(tfIPAddress);
         panelTop.add(tfPort);
@@ -78,6 +81,7 @@ public class ClientGUI extends JFrame implements ActionListener, Thread.Uncaught
         add(panelTop, BorderLayout.NORTH);
         add(panelBottom, BorderLayout.SOUTH);
         setVisible(true);
+        setVisiblePanel(visibleFlag);
     }
 
     @Override
@@ -85,20 +89,40 @@ public class ClientGUI extends JFrame implements ActionListener, Thread.Uncaught
         Object src = e.getSource();
         if (src == cbAlwaysOnTop) {
             setAlwaysOnTop(cbAlwaysOnTop.isSelected());
-        } else if (src == btnSend || src == tfMessage) {
+        } else
+            if (src == btnSend || src == tfMessage) {
             sendMessage();
-        } else if (src == btnLogin) {
-            connect();
-        } else {
-            throw new RuntimeException("Unknown source:" + src);
-        }
+            }     else
+                    if (src == btnLogin) {
+                        connect();
+                        setVisiblePanel(visibleFlag);
+
+                    }       else
+                              if (src == btnDisconnect) {
+                                  disconnect();
+                                  setVisiblePanel(visibleFlag);
+                              } else
+                                  { throw new RuntimeException("Unknown source:" + src);}
     }
 
     private void connect() {
         try {
-            Socket socket = new Socket(tfIPAddress.getText(), Integer.parseInt(tfPort.getText()));
+            socket = new Socket(tfIPAddress.getText(), Integer.parseInt(tfPort.getText()));
             socketThread = new SocketThread(this, "Client", socket);
+            visibleFlag = 2;
         } catch (IOException e) {
+            showException(Thread.currentThread(), e);
+        }
+    }
+    private void disconnect() {
+        visibleFlag = 1;
+        try {
+            socketThread.interrupt();
+            if (socketThread.isAlive()) {System.out.println(socketThread.getName());}
+            socketThread.close();
+            if (socketThread.isAlive()) {System.out.println(socketThread.getName());}
+
+        } catch (NullPointerException e) {
             showException(Thread.currentThread(), e);
         }
     }
@@ -135,6 +159,13 @@ public class ClientGUI extends JFrame implements ActionListener, Thread.Uncaught
                 log.setCaretPosition(log.getDocument().getLength());
             }
         });
+    }
+    private void setVisiblePanel (int flag) {
+        boolean lPan, sPan;
+        if (flag == 1) {lPan = true; sPan = false; }
+          else {lPan = false; sPan = true; }
+        panelTop.setVisible(lPan);
+        panelBottom.setVisible(sPan);
     }
 
     private void showException(Thread t, Throwable e) {
